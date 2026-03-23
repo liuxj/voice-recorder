@@ -958,6 +958,20 @@
             if (e.key === 'Enter') goToStep2();
         });
         
+        // 监听页面可见性变化（切换APP时保存录音）
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'hidden' && isRecording) {
+                // 用户切换到其他APP，停止并保存当前录音
+                console.log('App backgrounded, saving recording...');
+                stopRecording();
+                // 自动保存
+                if (currentSessionBlobs.length > 0) {
+                    await saveCurrentSession();
+                }
+                alert('已自动保存录音');
+            }
+        });
+        
         init();
     </script>
 </body>
