@@ -537,6 +537,7 @@
         
         // 录音相关
         let mediaRecorder;
+        let mediaStream = null;
         let audioChunks = [];
         let isRecording = false;
         let isPaused = false;
@@ -550,8 +551,12 @@
         
         async function initRecorder() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                // 释放之前的流
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(mediaStream);
                 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
@@ -572,6 +577,11 @@
                         updateSegmentsCount();
                         document.getElementById('saveBtn').disabled = false;
                     }
+                    // 停止后释放麦克风
+                    if (mediaStream) {
+                        mediaStream.getTracks().forEach(track => track.stop());
+                        mediaStream = null;
+                    }
                 };
             } catch (err) {
                 alert('请允许麦克风权限');
@@ -587,18 +597,49 @@
             }
         }
         
-        function startRecording() {
-            if (!mediaRecorder) {
-                initRecorder().then(() => startRecording());
+        async function startRecording() {
+            // 如果没有流，重新初始化
+            if (!mediaStream || !mediaRecorder) {
+                await initRecorder();
+            }
+            
+            // 重新获取麦克风权限
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(mediaStream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    if (audioChunks.length > 0) {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        currentSessionBlobs.push(blob);
+                        currentSegments.push({
+                            index: currentSegments.length + 1,
+                            blob: blob,
+                            duration: Math.floor((Date.now() - startTime + pauseTime) / 1000)
+                        });
+                        audioChunks = [];
+                        updateSegmentsCount();
+                        document.getElementById('saveBtn').disabled = false;
+                    }
+                    // 停止后释放麦克风
+                    if (mediaStream) {
+                        mediaStream.getTracks().forEach(track => track.stop());
+                        mediaStream = null;
+                    }
+                };
+            } catch (err) {
+                console.error(err);
                 return;
             }
             
-            // 如果有之前的音频块，重新创建 MediaRecorder
-            if (audioChunks.length > 0) {
-                audioChunks = [];
-            }
-            
-            mediaRecorder.start(100); // 每100ms收集一次数据
+            audioChunks = [];
+            mediaRecorder.start(100);
             isRecording = true;
             isPaused = false;
             startTime = Date.now();
@@ -621,39 +662,91 @@
             
             document.getElementById('micButton').classList.remove('recording');
             document.getElementById('micIcon').innerHTML = '<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>';
-            document.getElementById('statusText').textContent = '录音已暂停';
+            document.getElementById('statusText').textContent = '点击开始新录音';
             document.getElementById('statusText').classList.remove('recording');
             
-            document.getElementById('recordBtnText').textContent = '继续录音';
+            document.getElementById('recordBtnText').textContent = '开始录音';
             document.getElementById('pauseBtn').disabled = true;
             
             clearInterval(timerInterval);
             updateTimer();
+            
+            // 释放麦克风焦点
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                mediaRecorder = null;
+            }
         }
         
-        function togglePause() {
+        async function togglePause() {
             if (isPaused) {
-                // 恢复录音 - 实际上是通过重新 start 来实现
+                // 恢复录音 - 重新获取麦克风
                 try {
+                    if (mediaStream) {
+                        mediaStream.getTracks().forEach(track => track.stop());
+                    }
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(mediaStream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        if (audioChunks.length > 0) {
+                            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                            currentSessionBlobs.push(blob);
+                            currentSegments.push({
+                                index: currentSegments.length + 1,
+                                blob: blob,
+                                duration: Math.floor((Date.now() - startTime + pauseTime) / 1000)
+                            });
+                            audioChunks = [];
+                            updateSegmentsCount();
+                            document.getElementById('saveBtn').disabled = false;
+                        }
+                        if (mediaStream) {
+                            mediaStream.getTracks().forEach(track => track.stop());
+                            mediaStream = null;
+                        }
+                    };
+                    
                     mediaRecorder.start(100);
                     isPaused = false;
+                    isRecording = true;
+                    startTime = Date.now();
+                    
                     document.getElementById('pauseBtnText').textContent = '暂停';
                     document.getElementById('statusText').textContent = '正在录音...';
                     document.getElementById('micButton').classList.add('recording');
-                    startTime = Date.now(); // 重置开始时间
+                    document.getElementById('recordBtnText').textContent = '停止';
+                    
+                    timerInterval = setInterval(updateTimer, 100);
                 } catch(e) {
-                    // 如果 recorder 已经 stopped，重新开始
-                    mediaRecorder.start(100);
-                    isPaused = false;
-                    startTime = Date.now();
+                    console.error(e);
+                    alert('无法重新获取麦克风');
                 }
             } else {
-                // 暂停
+                // 暂停 - 停止并释放
                 mediaRecorder.stop();
                 isPaused = true;
+                isRecording = false;
+                
+                clearInterval(timerInterval);
+                
                 document.getElementById('pauseBtnText').textContent = '继续';
                 document.getElementById('statusText').textContent = '已暂停';
                 document.getElementById('micButton').classList.remove('recording');
+                
+                // 释放麦克风
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                    mediaRecorder = null;
+                }
             }
         }
         
