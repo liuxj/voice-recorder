@@ -2,310 +2,483 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>语音录制器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
         body {
-            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: white;
             display: flex;
+            flex-direction: column;
+        }
+        
+        /* 引导步骤 */
+        .step {
+            display: none;
+            flex: 1;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            padding: 20px;
-        }
-        .container {
+            padding: 30px;
             text-align: center;
-            max-width: 500px;
-            width: 100%;
+            animation: fadeIn 0.5s ease;
         }
-        h1 {
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        .step.active {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Login Screen */
-        .login-screen {
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
-            padding: 40px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
+        .step-icon {
+            font-size: 4rem;
+            margin-bottom: 30px;
         }
-        .login-screen input {
-            width: 100%;
-            padding: 15px 20px;
-            border: none;
-            border-radius: 30px;
-            font-size: 1.1rem;
+        .step-title {
+            font-size: 1.8rem;
             margin-bottom: 20px;
-            background: rgba(255,255,255,0.9);
-            text-align: center;
+            font-weight: 600;
         }
-        .login-screen input:focus {
-            outline: none;
-            box-shadow: 0 0 20px rgba(0,217,255,0.5);
+        .step-desc {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 40px;
         }
-        .login-screen button {
+        
+        /* 输入框 */
+        .input-box {
             width: 100%;
-            padding: 15px;
+            max-width: 300px;
+        }
+        .input-box input {
+            width: 100%;
+            padding: 18px 24px;
             border: none;
-            border-radius: 30px;
+            border-radius: 16px;
+            font-size: 1.2rem;
+            background: rgba(255,255,255,0.95);
+            text-align: center;
+            outline: none;
+        }
+        .input-box input:focus {
+            box-shadow: 0 0 0 3px rgba(0,217,255,0.5);
+        }
+        
+        /* 按钮 */
+        .btn {
+            padding: 18px 48px;
+            border: none;
+            border-radius: 50px;
             font-size: 1.1rem;
             cursor: pointer;
-            background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
-            color: white;
             font-weight: 600;
             transition: all 0.3s ease;
+            margin: 10px;
         }
-        .login-screen button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0,217,255,0.4);
+        .btn-primary {
+            background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
+            color: white;
+            box-shadow: 0 8px 30px rgba(0,217,255,0.4);
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
         }
         
-        /* Recorder Screen */
-        .recorder-screen {
-            display: none;
-        }
-        .user-info {
-            background: rgba(0,217,255,0.2);
-            padding: 10px 20px;
-            border-radius: 30px;
-            margin-bottom: 20px;
-            display: inline-flex;
+        /* 录音界面 */
+        .recorder-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            padding: 20px;
         }
-        .user-info .logout-btn {
+        .user-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-name {
+            background: rgba(0,217,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        .btn-text {
             background: transparent;
             color: #ff6b6b;
-            padding: 5px 10px;
-            font-size: 0.8rem;
+            padding: 8px 16px;
+            font-size: 0.9rem;
         }
-        .recorder {
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
-            padding: 40px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        .mic-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
+        
+        .mic-button {
+            width: 120px;
+            height: 120px;
             border-radius: 50%;
             background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            box-shadow: 0 10px 40px rgba(233,69,96,0.5);
             transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(233,69,96,0.4);
+            margin: 30px 0;
         }
-        .mic-icon:hover {
-            transform: scale(1.1);
-            box-shadow: 0 15px 40px rgba(233,69,96,0.6);
+        .mic-button:active {
+            transform: scale(0.9);
         }
-        .mic-icon.recording {
+        .mic-button.recording {
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(233,69,96,0.5); }
+            50% { transform: scale(1.1); box-shadow: 0 15px 60px rgba(233,69,96,0.8); }
         }
-        .mic-icon svg {
-            width: 40px;
-            height: 40px;
+        .mic-button svg {
+            width: 50px;
+            height: 50px;
             fill: white;
         }
-        .status {
-            font-size: 1.2rem;
-            margin-bottom: 20px;
-            color: #ccc;
+        
+        .timer {
+            font-size: 3rem;
+            font-weight: bold;
+            font-family: 'SF Mono', monospace;
+            margin: 20px 0;
         }
-        .status.recording {
+        
+        .status-text {
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 20px;
+        }
+        .status-text.recording {
             color: #e94560;
         }
-        .timer {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 20px;
-            font-family: monospace;
+        
+        /* 完成界面 */
+        .complete-stats {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            width: 100%;
+            max-width: 320px;
         }
-        .controls {
+        .stat-item {
             display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 30px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
+        .stat-item:last-child {
+            border-bottom: none;
         }
-        .btn-record {
-            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 320px;
+        }
+        
+        .btn-share {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
             color: white;
+            box-shadow: 0 8px 30px rgba(76,175,80,0.4);
         }
-        .btn-record:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(233,69,96,0.4);
-        }
-        .btn-stop {
-            background: #444;
-            color: white;
-        }
-        .btn-download {
+        .btn-new {
             background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
             color: white;
         }
-        .btn-download:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .btn-list {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
         }
-        .btn-download:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0,217,255,0.4);
+        
+        /* 录音列表 */
+        .recordings-view {
+            display: none;
+            flex: 1;
+            flex-direction: column;
         }
-        .recordings-list {
-            margin-top: 30px;
-            text-align: left;
+        .recordings-view.active {
+            display: flex;
         }
-        .recordings-list h3 {
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-            color: #aaa;
-        }
-        .recording-item {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
+        .recordings-header {
+            padding: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            background: rgba(0,0,0,0.2);
         }
-        .recording-item .user-tag {
-            background: rgba(0,217,255,0.3);
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            color: #00d9ff;
+        .recordings-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .recording-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .recording-item audio {
             flex: 1;
-            min-width: 200px;
+            height: 40px;
+        }
+        .recording-item .time {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+            min-width: 50px;
         }
         .recording-item .delete-btn {
             background: transparent;
-            color: #e94560;
-            padding: 5px 10px;
-            font-size: 0.9rem;
+            color: #ff6b6b;
+            padding: 8px;
+            font-size: 1.2rem;
+        }
+        
+        /* 加载动画 */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .loading.active {
+            display: flex;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #00d9ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            margin-top: 20px;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎙️ 语音录制器</h1>
+    <!-- 步骤1: 输入名字 -->
+    <div class="step active" id="step1">
+        <div class="step-icon">👋</div>
+        <div class="step-title">你好！</div>
+        <div class="step-desc">请告诉我你的名字</div>
+        <div class="input-box">
+            <input type="text" id="userName" placeholder="请输入名字" maxlength="20" inputmode="text">
+        </div>
+        <button class="btn btn-primary" onclick="goToStep2()">下一步</button>
+    </div>
+    
+    <!-- 步骤2: 开始录音 -->
+    <div class="step" id="step2">
+        <div class="user-header">
+            <div class="user-name">👤 <span id="displayName"></span></div>
+            <button class="btn btn-text" onclick="resetUser()">切换用户</button>
+        </div>
+        <div class="recorder-area">
+            <div class="step-icon">🎙️</div>
+            <div class="step-title">准备好了吗？</div>
+            <div class="status-text" id="statusText">点击开始录音</div>
+            
+            <div class="mic-button" id="micButton" onclick="toggleRecording()">
+                <svg viewBox="0 0 24 24" id="micIcon">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </div>
+            
+            <div class="timer" id="timer">00:00</div>
+        </div>
+        <button class="btn btn-secondary" onclick="showRecordings()">📋 查看录音列表</button>
+    </div>
+    
+    <!-- 步骤3: 录音完成 -->
+    <div class="step" id="step3">
+        <div class="step-icon">✅</div>
+        <div class="step-title">录音完成！</div>
         
-        <!-- 登录界面 -->
-        <div class="login-screen" id="loginScreen">
-            <input type="text" id="usernameInput" placeholder="请输入你的名字" maxlength="20">
-            <button onclick="login()">进入</button>
+        <div class="complete-stats">
+            <div class="stat-item">
+                <span>录音时长</span>
+                <span id="finalDuration">00:00</span>
+            </div>
+            <div class="stat-item">
+                <span>文件大小</span>
+                <span id="fileSize">0 KB</span>
+            </div>
+            <div class="stat-item">
+                <span>录音编号</span>
+                <span id="recordIndex">#1</span>
+            </div>
         </div>
         
-        <!-- 录音界面 -->
-        <div class="recorder-screen" id="recorderScreen">
-            <div class="user-info">
-                <span>👤 你好，<strong id="displayName"></strong></span>
-                <button class="logout-btn" onclick="logout()">切换用户</button>
-            </div>
-            <div class="recorder">
-                <div class="mic-icon" id="micBtn">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
-                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                    </svg>
-                </div>
-                <div class="status" id="status">点击麦克风开始录制</div>
-                <div class="timer" id="timer">00:00</div>
-                <div class="controls">
-                    <button class="btn-record" id="recordBtn">开始录制</button>
-                    <button class="btn-stop" id="stopBtn" disabled>停止</button>
-                    <button class="btn-download" id="downloadBtn" disabled>下载录音</button>
-                </div>
-                <div class="recordings-list" id="recordingsList">
-                    <h3>录音记录</h3>
-                </div>
-            </div>
+        <div class="action-buttons">
+            <button class="btn btn-share" onclick="shareRecordings()">📤 分享录音</button>
+            <button class="btn btn-new" onclick="goToStep2()">🎙️ 继续录音</button>
+            <button class="btn btn-list" onclick="showRecordings()">📋 查看全部录音</button>
         </div>
     </div>
-
+    
+    <!-- 录音列表 -->
+    <div class="recordings-view" id="recordingsView">
+        <div class="recordings-header">
+            <div>
+                <button class="btn btn-text" onclick="backToRecord()">← 返回</button>
+            </div>
+            <div style="font-weight: 600;">录音列表 (<span id="totalCount">0</span>)</div>
+            <div>
+                <button class="btn btn-text" onclick="clearAll()">清空</button>
+            </div>
+        </div>
+        <div class="recordings-list" id="recordingsList"></div>
+    </div>
+    
+    <!-- 加载中 -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">处理中...</div>
+    </div>
+    
     <script>
-        let username = localStorage.getItem('voice_username') || '';
+        // 生成唯一用户ID
+        function getUserId() {
+            let userId = localStorage.getItem('voice_user_id');
+            if (!userId) {
+                userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('voice_user_id', userId);
+            }
+            return userId;
+        }
+        
+        // 获取/设置用户名
+        function getUserName() {
+            return localStorage.getItem('voice_user_name') || '';
+        }
+        
+        function setUserName(name) {
+            localStorage.setItem('voice_user_name', name);
+        }
+        
+        // IndexedDB 操作
+        let db;
+        const DB_NAME = 'VoiceRecorder';
+        const STORE_NAME = 'recordings';
+        
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        store.createIndex('createdAt', 'createdAt', { unique: false });
+                    }
+                };
+            });
+        }
+        
+        function saveRecording(blob) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const record = {
+                    id: 'rec_' + Date.now(),
+                    blob: blob,
+                    createdAt: new Date().toISOString(),
+                    userId: getUserId()
+                };
+                const request = store.add(record);
+                request.onsuccess = () => resolve(record);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        function getAllRecordings() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        function deleteRecording(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        function clearAllRecordings() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.clear();
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // 录音相关
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
         let startTime;
         let timerInterval;
-        let currentAudioBlob;
-
-        const loginScreen = document.getElementById('loginScreen');
-        const recorderScreen = document.getElementById('recorderScreen');
-        const usernameInput = document.getElementById('usernameInput');
-        const displayName = document.getElementById('displayName');
-        const micBtn = document.getElementById('micBtn');
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const status = document.getElementById('status');
-        const timer = document.getElementById('timer');
-        const recordingsList = document.getElementById('recordingsList');
-
-        // 检查登录状态
-        if (username) {
-            showRecorder();
-        }
-
-        function login() {
-            const name = usernameInput.value.trim();
-            if (!name) {
-                alert('请输入名字');
-                return;
-            }
-            username = name;
-            localStorage.setItem('voice_username', username);
-            showRecorder();
-        }
-
-        function logout() {
-            username = '';
-            localStorage.removeItem('voice_username');
-            loginScreen.style.display = 'block';
-            recorderScreen.style.display = 'none';
-        }
-
-        function showRecorder() {
-            displayName.textContent = username;
-            loginScreen.style.display = 'none';
-            recorderScreen.style.display = 'block';
-            initRecorder();
-        }
-
+        let currentBlob;
+        
         async function initRecorder() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -315,95 +488,255 @@
                     audioChunks.push(event.data);
                 };
                 
-                mediaRecorder.onstop = () => {
-                    currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    downloadBtn.disabled = false;
-                    addRecordingToList(currentAudioBlob, username);
+                mediaRecorder.onstop = async () => {
+                    currentBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     audioChunks = [];
+                    
+                    // 保存到 IndexedDB
+                    await saveRecording(currentBlob);
+                    
+                    // 显示完成界面
+                    showComplete();
                 };
             } catch (err) {
-                status.textContent = '请允许麦克风权限';
+                alert('请允许麦克风权限');
                 console.error(err);
             }
         }
-
-        function startRecording() {
-            if (!mediaRecorder) {
-                initRecorder().then(() => startRecording());
-                return;
-            }
-            mediaRecorder.start();
-            isRecording = true;
-            startTime = Date.now();
-            
-            status.textContent = '正在录制...';
-            status.classList.add('recording');
-            recordBtn.disabled = true;
-            stopBtn.disabled = false;
-            micBtn.classList.add('recording');
-            
-            timerInterval = setInterval(updateTimer, 100);
-        }
-
-        function stopRecording() {
-            mediaRecorder.stop();
-            isRecording = false;
-            
-            status.textContent = '录制完成';
-            status.classList.remove('recording');
-            recordBtn.disabled = false;
-            stopBtn.disabled = true;
-            micBtn.classList.remove('recording');
-            
-            clearInterval(timerInterval);
-        }
-
-        function updateTimer() {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
-            const seconds = (elapsed % 60).toString().padStart(2, '0');
-            timer.textContent = `${minutes}:${seconds}`;
-        }
-
-        function downloadRecording() {
-            if (!currentAudioBlob) return;
-            
-            const url = URL.createObjectURL(currentAudioBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${username}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function addRecordingToList(blob, user) {
-            const url = URL.createObjectURL(blob);
-            const item = document.createElement('div');
-            item.className = 'recording-item';
-            item.innerHTML = `
-                <span class="user-tag">${user}</span>
-                <audio controls src="${url}"></audio>
-                <button class="delete-btn" onclick="this.parentElement.remove()">删除</button>
-            `;
-            recordingsList.appendChild(item);
-        }
-
-        micBtn.addEventListener('click', () => {
+        
+        function toggleRecording() {
             if (isRecording) {
                 stopRecording();
             } else {
                 startRecording();
             }
+        }
+        
+        function startRecording() {
+            if (!mediaRecorder) {
+                initRecorder().then(() => startRecording());
+                return;
+            }
+            
+            mediaRecorder.start();
+            isRecording = true;
+            startTime = Date.now();
+            
+            document.getElementById('micButton').classList.add('recording');
+            document.getElementById('micIcon').innerHTML = '<rect x="6" y="6" width="12" height="12" fill="white"/>';
+            document.getElementById('statusText').textContent = '正在录音...';
+            document.getElementById('statusText').classList.add('recording');
+            
+            timerInterval = setInterval(updateTimer, 100);
+        }
+        
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            document.getElementById('micButton').classList.remove('recording');
+            document.getElementById('micIcon').innerHTML = '<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>';
+            document.getElementById('statusText').textContent = '录音完成';
+            document.getElementById('statusText').classList.remove('recording');
+            
+            clearInterval(timerInterval);
+        }
+        
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const seconds = (elapsed % 60).toString().padStart(2, '0');
+            document.getElementById('timer').textContent = `${minutes}:${seconds}`;
+        }
+        
+        // 界面跳转
+        function goToStep2() {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) {
+                alert('请输入名字');
+                return;
+            }
+            setUserName(name);
+            document.getElementById('displayName').textContent = name;
+            
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+            
+            initRecorder();
+        }
+        
+        function resetUser() {
+            localStorage.removeItem('voice_user_name');
+            document.getElementById('userName').value = '';
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step1').classList.add('active');
+            document.getElementById('timer').textContent = '00:00';
+        }
+        
+        async function showComplete() {
+            const recordings = await getAllRecordings();
+            const index = recordings.length;
+            
+            // 计算时长
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const seconds = (elapsed % 60).toString().padStart(2, '0');
+            
+            // 文件大小
+            const sizeKB = Math.round(currentBlob.size / 1024);
+            const sizeStr = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
+            
+            document.getElementById('finalDuration').textContent = `${minutes}:${seconds}`;
+            document.getElementById('fileSize').textContent = sizeStr;
+            document.getElementById('recordIndex').textContent = '#' + index;
+            
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.add('active');
+            
+            document.getElementById('timer').textContent = '00:00';
+        }
+        
+        async function showRecordings() {
+            const recordings = await getAllRecordings();
+            const userName = getUserName();
+            
+            document.getElementById('totalCount').textContent = recordings.length;
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.remove('active');
+            document.getElementById('recordingsView').classList.add('active');
+            
+            const list = document.getElementById('recordingsList');
+            list.innerHTML = '';
+            
+            // 按时间倒序
+            recordings.reverse().forEach(rec => {
+                const url = URL.createObjectURL(rec.blob);
+                const date = new Date(rec.createdAt);
+                const timeStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2,'0')}`;
+                
+                const item = document.createElement('div');
+                item.className = 'recording-item';
+                item.innerHTML = `
+                    <span class="time">${timeStr}</span>
+                    <audio controls src="${url}"></audio>
+                    <button class="delete-btn" onclick="deleteRec('${rec.id}', this)">🗑️</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function backToRecord() {
+            document.getElementById('recordingsView').classList.remove('active');
+            document.getElementById('step2').classList.add('active');
+        }
+        
+        async function deleteRec(id, btn) {
+            await deleteRecording(id);
+            btn.parentElement.remove();
+            const count = document.getElementById('recordingsList').children.length;
+            document.getElementById('totalCount').textContent = count;
+        }
+        
+        async function clearAll() {
+            if (confirm('确定要清空所有录音吗？')) {
+                await clearAllRecordings();
+                document.getElementById('recordingsList').innerHTML = '';
+                document.getElementById('totalCount').textContent = '0';
+            }
+        }
+        
+        // 分享功能
+        async function shareRecordings() {
+            const recordings = await getAllRecordings();
+            if (recordings.length === 0) {
+                alert('没有录音可分享');
+                return;
+            }
+            
+            showLoading('正在打包...');
+            
+            try {
+                const zip = new JSZip();
+                const userName = getUserName();
+                
+                // 添加录音文件
+                for (let i = 0; i < recordings.length; i++) {
+                    const rec = recordings[i];
+                    const date = new Date(rec.createdAt);
+                    const filename = `${userName}_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate()}_${date.getHours()}${date.getMinutes()}${date.getSeconds()}.webm`;
+                    zip.file(filename, rec.blob);
+                }
+                
+                // 添加说明文件
+                const info = `语音录制器导出\n用户名: ${userName}\n录音数量: ${recordings.length}\n导出时间: ${new Date().toLocaleString()}`;
+                zip.file('说明.txt', info);
+                
+                const content = await zip.generateAsync({ type: 'blob' });
+                
+                // 使用 Web Share API
+                const file = new File([content], `${userName}_录音_${recordings.length}个.zip`, {
+                    type: 'application/zip'
+                });
+                
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: '语音录音',
+                        text: `这是 ${userName} 的 ${recordings.length} 条录音`
+                    });
+                } else if (navigator.share) {
+                    // 不支持文件分享，尝试普通分享
+                    const url = URL.createObjectURL(content);
+                    await navigator.share({
+                        title: '语音录音',
+                        text: `这是 ${userName} 的 ${recordings.length} 条录音`,
+                        url: url
+                    });
+                } else {
+                    // 不支持分享，下载
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(content);
+                    a.download = `${userName}_录音_${recordings.length}个.zip`;
+                    a.click();
+                    alert('已下载 ZIP 文件');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('分享失败，请重试');
+            }
+            
+            hideLoading();
+        }
+        
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').classList.add('active');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+        
+        // 初始化
+        async function init() {
+            getUserId();
+            await initDB();
+            
+            const name = getUserName();
+            if (name) {
+                document.getElementById('displayName').textContent = name;
+                document.getElementById('step1').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+                initRecorder();
+            }
+        }
+        
+        // 回车下一步
+        document.getElementById('userName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') goToStep2();
         });
-
-        recordBtn.addEventListener('click', startRecording);
-        stopBtn.addEventListener('click', stopRecording);
-        downloadBtn.addEventListener('click', downloadRecording);
-
-        // 回车登录
-        usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') login();
-        });
+        
+        init();
     </script>
 </body>
 </html>
